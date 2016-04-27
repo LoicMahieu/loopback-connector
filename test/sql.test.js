@@ -12,6 +12,7 @@ var connector;
 var Customer;
 var Order;
 var Store;
+var Address;
 
 describe('sql connector', function() {
   before(function() {
@@ -52,6 +53,14 @@ describe('sql connector', function() {
         },
         state: String
       });
+    Address = ds.createModel('address',
+      {
+        id: {
+          id: true,
+          type: String
+        },
+        street: String
+      });
     // Relations
     Customer.hasMany(Order, {as: 'orders', foreignKey: 'customer_name'});
     Order.belongsTo(Customer, {as: 'customer', foreignKey: 'customer_name'});
@@ -65,6 +74,12 @@ describe('sql connector', function() {
     });
     Customer.belongsTo(Store, {as: 'favorite_store', foreignKey: 'favorite_store'});
     Store.hasMany(Customer, {as: 'customers_fav', foreignKey: 'favorite_store'});
+    Store.hasOne(Address, {
+      as: 'deliveryAddress',
+      polymorphic: {
+        foreignKey: 'ownerId'
+      }
+    });
   });
 
   it('should map table name', function() {
@@ -404,6 +419,29 @@ describe('sql connector', function() {
           'AND `customers`.`VIP`=$1   ' +
         'ORDER BY `STORE`.`ID`',
       params: [true]
+    });
+  });
+
+  it('builds SELECT with INNER JOIN (polymorphic relation)', function () {
+    var sql = connector.buildSelect('store', {
+      where: {
+        deliveryAddress: {
+          street: 'foo'
+        }
+      }
+    });
+
+    expect(sql.toJSON()).to.eql({
+      sql:
+        'SELECT DISTINCT `STORE`.`ID`,' +
+                        '`STORE`.`STATE` ' +
+        'FROM `STORE` ' +
+        'INNER JOIN `ADDRESS` AS `deliveryAddress` ' +
+          'ON `STORE`.`ID`=`deliveryAddress`.`OWNERID` ' +
+          'AND `deliveryAddress`.`STREET`=$1 ' +
+          'AND `deliveryAddress`.`REFERENCETYPE`=$2   ' +
+        'ORDER BY `STORE`.`ID`',
+      params: ['foo', 'store']
     });
   });
 
