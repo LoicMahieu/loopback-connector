@@ -1,10 +1,15 @@
+// Copyright IBM Corp. 2014,2016. All Rights Reserved.
+// Node module: loopback-connector
+// This file is licensed under the MIT License.
+// License text available at https://opensource.org/licenses/MIT
+
 var expect = require('chai').expect;
 var testConnector = require('./connectors/test-sql-connector');
 
 var juggler = require('loopback-datasource-juggler');
 var ds = new juggler.DataSource({
   connector: testConnector,
-  debug: true
+  debug: true,
 });
 
 describe('sql connector', function() {
@@ -43,5 +48,4 @@ describe('sql connector', function() {
       done();
     });
   });
-
 });

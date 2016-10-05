@@ -1,6 +1,6 @@
 {
   "name": "loopback-connector",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Building blocks for LoopBack connectors",
   "keywords": [
     "StrongLoop",
@@ -13,7 +13,8 @@
   },
   "main": "index.js",
   "scripts": {
-    "pretest": "jshint .",
+    "lint": "eslint .",
+    "posttest": "npm run lint",
     "test": "mocha"
   },
   "license": "MIT",
@@ -23,7 +24,8 @@
   },
   "devDependencies": {
     "chai": "~2.3.0",
-    "jshint": "^2.7.0",
+    "eslint": "^2.7.0",
+    "eslint-config-loopback": "^1.0.0",
     "loopback-datasource-juggler": "^2.29.0",
     "mocha": "^2.2.5"
   }
