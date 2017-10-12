@@ -366,7 +366,7 @@ describe('sql connector', function() {
     expect(sql.toJSON()).to.eql({
       sql:
         'INNER JOIN `ORDER` AS `orders` ' +
-        'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` AND `orders`.`ID`=? ',
+        'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` AND ( `orders`.`ID`=? ) ',
       params: [10]
     });
   });
@@ -399,7 +399,7 @@ describe('sql connector', function() {
         'FROM `CUSTOMER` ' +
         'INNER JOIN `ORDER` AS `orders` ' +
           'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` ' +
-          'AND `orders`.`DATE` BETWEEN $1 AND $2   ' +
+          'AND ( `orders`.`DATE` BETWEEN $1 AND $2 )   ' +
         'ORDER BY `CUSTOMER`.`NAME`',
       params: ['2015-01-01', '2015-01-31']
     });
@@ -423,7 +423,7 @@ describe('sql connector', function() {
           'ON `STORE`.`ID`=`customers_though`.`STORE_ID`  ' +
         'INNER JOIN `CUSTOMER` AS `customers` ' +
           'ON `customers_though`.`CUSTOMER_NAME`=`customers`.`NAME` ' +
-          'AND `customers`.`VIP`=$1   ' +
+          'AND ( `customers`.`VIP`=$1 )   ' +
         'ORDER BY `STORE`.`ID`',
       params: [true]
     });
@@ -445,8 +445,8 @@ describe('sql connector', function() {
         'FROM `STORE` ' +
         'INNER JOIN `ADDRESS` AS `deliveryAddress` ' +
           'ON `STORE`.`ID`=`deliveryAddress`.`OWNERID` ' +
-          'AND `deliveryAddress`.`STREET`=$1 ' +
-          'AND `deliveryAddress`.`REFERENCETYPE`=$2   ' +
+          'AND ( `deliveryAddress`.`STREET`=$1 ' +
+          'AND `deliveryAddress`.`REFERENCETYPE`=$2 )   ' +
         'ORDER BY `STORE`.`ID`',
       params: ['foo', 'store']
     });
@@ -796,10 +796,10 @@ describe('sql connector', function() {
         'FROM `ORDER` ' +
         'INNER JOIN `CUSTOMER` AS `customer` ' +
           'ON `ORDER`.`CUSTOMER_NAME`=`customer`.`NAME` ' +
-          'AND `customer`.`NAME`=$1 ' +
+          'AND ( `customer`.`NAME`=$1 ) ' +
         'INNER JOIN `STORE` AS `customer_favorite_store` ' +
           'ON `customer`.`FAVORITE_STORE`=`customer_favorite_store`.`ID` ' +
-          'AND `customer_favorite_store`.`STATE`=$2  ' +
+          'AND ( `customer_favorite_store`.`STATE`=$2 )  ' +
         'WHERE `ORDER`.`DATE` BETWEEN $3 AND $4 ' +
           'ORDER BY `customer_favorite_store`.`STATE` DESC,' +
                    '`customer`.`NAME` ASC',
@@ -832,7 +832,7 @@ describe('sql connector', function() {
         'FROM `ORDER` ' +
         'INNER JOIN `CUSTOMER` AS `customer` ' +
           'ON `ORDER`.`CUSTOMER_NAME`=`customer`.`NAME` ' +
-          'AND `customer`.`NAME`=$1 ' +
+          'AND ( `customer`.`NAME`=$1 ) ' +
         'LEFT JOIN `STORE` AS `customer_favorite_store` ' +
           'ON `customer`.`FAVORITE_STORE`=`customer_favorite_store`.`ID`  ' +
         'WHERE `ORDER`.`DATE` BETWEEN $2 AND $3 ' +
@@ -868,10 +868,10 @@ describe('sql connector', function() {
         'FROM `CUSTOMER` ' +
         'INNER JOIN `ORDER` AS `orders` ' +
           'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` ' +
-          'AND `orders`.`DATE` BETWEEN $1 AND $2  ' +
+          'AND ( `orders`.`DATE` BETWEEN $1 AND $2 )  ' +
         'INNER JOIN `STORE` AS `favorite_store` ' +
           'ON `CUSTOMER`.`FAVORITE_STORE`=`favorite_store`.`ID` ' +
-          'AND `favorite_store`.`STATE`=$3   ' +
+          'AND ( `favorite_store`.`STATE`=$3 )   ' +
         'ORDER BY `CUSTOMER`.`NAME`',
       params: ['2015-01-01', '2015-01-31', 'NY']
     });
@@ -898,9 +898,39 @@ describe('sql connector', function() {
         'LEFT JOIN `ORDER` AS `orders` ' +
           'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` ' +
         'INNER JOIN `STORE` AS `orders_store` ' +
-          'ON `orders`.`STORE_ID`=`orders_store`.`ID` AND `orders_store`.`STATE`=$1   ' +
+          'ON `orders`.`STORE_ID`=`orders_store`.`ID` AND ( `orders_store`.`STATE`=$1 )   ' +
         'ORDER BY `CUSTOMER`.`NAME`',
       params: ['NY']
+    });
+  });
+
+  it('builds nested SELECTs with or', function () {
+    var sql = connector.buildSelect('customer', {
+      where: {
+        orders: {
+          store: {
+            or: [
+              { state: 'NY' },
+              { state: 'LA' }
+            ]
+          }
+        }
+      }
+    });
+
+    expect(sql.toJSON()).to.eql({
+      sql:
+        'SELECT DISTINCT `CUSTOMER`.`NAME`,' +
+                        '`CUSTOMER`.`VIP`,' +
+                        '`CUSTOMER`.`ADDRESS`,'+
+                        '`CUSTOMER`.`FAVORITE_STORE` ' +
+        'FROM `CUSTOMER` ' +
+        'LEFT JOIN `ORDER` AS `orders` ' +
+          'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` ' +
+        'INNER JOIN `STORE` AS `orders_store` ' +
+          'ON `orders`.`STORE_ID`=`orders_store`.`ID` AND ( (`orders_store`.`STATE`=$1) OR (`orders_store`.`STATE`=$2) )   ' +
+        'ORDER BY `CUSTOMER`.`NAME`',
+      params: ['NY', 'LA']
     });
   });
 
@@ -933,7 +963,7 @@ describe('sql connector', function() {
         'FROM `CUSTOMER` ' +
         'INNER JOIN `ORDER` AS `orders` ' +
         'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` ' +
-        'AND `orders`.`DATE` BETWEEN $1 AND $2  ' +
+        'AND ( `orders`.`DATE` BETWEEN $1 AND $2 )  ' +
         'WHERE `CUSTOMER`.`NAME`=$3',
       params: ['2015-01-01', '2015-01-31', 'John']
     });
