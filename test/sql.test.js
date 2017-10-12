@@ -166,7 +166,7 @@ describe('sql connector', function() {
     var where = connector.buildWhere('customer',
       { or: [{ name: 'John' }, { name: 'Mary' }] });
     expect(where.toJSON()).to.eql({
-      sql: 'WHERE (`CUSTOMER`.`NAME`=?) OR (`CUSTOMER`.`NAME`=?)',
+      sql: 'WHERE ( (`CUSTOMER`.`NAME`=?) OR (`CUSTOMER`.`NAME`=?) )',
       params: ['John', 'Mary']
     });
   });
@@ -175,7 +175,7 @@ describe('sql connector', function() {
     var where = connector.buildWhere('customer',
       { and: [{ name: 'John' }, { vip: true }] });
     expect(where.toJSON()).to.eql({
-      sql: 'WHERE (`CUSTOMER`.`NAME`=?) AND (`CUSTOMER`.`VIP`=?)',
+      sql: 'WHERE ( (`CUSTOMER`.`NAME`=?) AND (`CUSTOMER`.`VIP`=?) )',
       params: ['John', true]
     });
   });
@@ -256,8 +256,8 @@ describe('sql connector', function() {
     var where = connector.buildWhere('customer',
       { and: [{ name: 'John' }, { or: [{ vip: true }, { address: null }] }] });
     expect(where.toJSON()).to.eql({
-      sql: 'WHERE (`CUSTOMER`.`NAME`=?) AND ((`CUSTOMER`.`VIP`=?) OR ' +
-        '(`CUSTOMER`.`ADDRESS` IS NULL))',
+      sql: 'WHERE ( (`CUSTOMER`.`NAME`=?) AND (( (`CUSTOMER`.`VIP`=?) OR ' +
+        '(`CUSTOMER`.`ADDRESS` IS NULL) )) )',
       params: ['John', true]
     });
   });
@@ -476,11 +476,11 @@ describe('sql connector', function() {
         'FROM `CUSTOMER` ' +
         'LEFT JOIN `ORDER` AS `orders` ' +
           'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME`  ' +
-        'WHERE (' +
-          '`orders`.`DATE` BETWEEN $1 AND $2' +
+        'WHERE ( ' +
+          '(`orders`.`DATE` BETWEEN $1 AND $2' +
         ') OR (' +
           '`orders`.`DATE` BETWEEN $3 AND $4' +
-        ') ' +
+        ') ) ' +
         'ORDER BY `CUSTOMER`.`NAME`',
       params: [
         '2015-01-01',
@@ -515,11 +515,11 @@ describe('sql connector', function() {
         'FROM `CUSTOMER` ' +
         'LEFT JOIN `ORDER` AS `orders` ' +
           'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME`  ' +
-        'WHERE (' +
-          '`orders`.`DATE` BETWEEN $1 AND $2' +
+        'WHERE ( ' +
+          '(`orders`.`DATE` BETWEEN $1 AND $2' +
         ') AND (' +
           '`orders`.`DATE` BETWEEN $3 AND $4' +
-        ') ' +
+        ') ) ' +
         'ORDER BY `CUSTOMER`.`NAME`',
       params: [
         '2015-01-01',
@@ -558,8 +558,8 @@ describe('sql connector', function() {
           'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` ' +
         'LEFT JOIN `STORE` AS `orders_store` ' +
           'ON `orders`.`STORE_ID`=`orders_store`.`ID`  ' +
-        'WHERE (`orders_store`.`STATE`=$1) ' +
-          'OR (`orders`.`DATE` BETWEEN $2 AND $3) ' +
+        'WHERE ( (`orders_store`.`STATE`=$1) ' +
+          'OR (`orders`.`DATE` BETWEEN $2 AND $3) ) ' +
         'ORDER BY `CUSTOMER`.`NAME`',
       params: [
         'NY',
@@ -601,8 +601,8 @@ describe('sql connector', function() {
           'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` ' +
         'LEFT JOIN `STORE` AS `orders_store` ' +
           'ON `orders`.`STORE_ID`=`orders_store`.`ID`  ' +
-        'WHERE (`orders`.`DATE` BETWEEN $1 AND $2 AND `orders_store`.`STATE`=$3) ' +
-          'OR (`orders`.`DATE` BETWEEN $4 AND $5 AND `orders_store`.`STATE`=$6) ' +
+        'WHERE ( (`orders`.`DATE` BETWEEN $1 AND $2 AND `orders_store`.`STATE`=$3) ' +
+          'OR (`orders`.`DATE` BETWEEN $4 AND $5 AND `orders_store`.`STATE`=$6) ) ' +
         'ORDER BY `CUSTOMER`.`NAME`',
       params: [
         '2015-01-01',
@@ -662,15 +662,15 @@ describe('sql connector', function() {
         'LEFT JOIN `ORDER` AS `favorite_store_orders` ' +
           'ON `favorite_store`.`ID`=`favorite_store_orders`.`STORE_ID`  ' +
         'WHERE (' +
-          '`favorite_store`.`STATE`=$1 AND (' +
+          ' (`favorite_store`.`STATE`=$1 AND ( (' +
             '`orders`.`DATE` BETWEEN $2 AND $3' +
           ') ' +
-          'OR (`orders`.`DATE` BETWEEN $4 AND $5)' +
+          'OR (`orders`.`DATE` BETWEEN $4 AND $5) )' +
         ') OR (' +
           '`favorite_store`.`STATE`=$6 ' +
-          'AND (`orders`.`DATE` BETWEEN $7 AND $8) ' +
-          'AND (`orders`.`DATE` BETWEEN $9 AND $10)' +
-        ') ' +
+          'AND ( (`orders`.`DATE` BETWEEN $7 AND $8) ' +
+          'AND (`orders`.`DATE` BETWEEN $9 AND $10) ' +
+        ')) ) ' +
         'ORDER BY `CUSTOMER`.`NAME`',
       params: [
         'NY',
@@ -928,9 +928,40 @@ describe('sql connector', function() {
         'LEFT JOIN `ORDER` AS `orders` ' +
           'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` ' +
         'INNER JOIN `STORE` AS `orders_store` ' +
-          'ON `orders`.`STORE_ID`=`orders_store`.`ID` AND ( (`orders_store`.`STATE`=$1) OR (`orders_store`.`STATE`=$2) )   ' +
+          'ON `orders`.`STORE_ID`=`orders_store`.`ID` AND ( ( (`orders_store`.`STATE`=$1) OR (`orders_store`.`STATE`=$2) ) )   ' +
         'ORDER BY `CUSTOMER`.`NAME`',
       params: ['NY', 'LA']
+    });
+  });
+
+  it('builds nested SELECTs with OR and AND', function () {
+    var sql = connector.buildSelect('customer', {
+      where: {
+        orders: {
+          store: {
+            or: [
+              { state: 'NY' },
+              { state: 'LA' }
+            ],
+            id: 1
+          }
+        }
+      }
+    });
+
+    expect(sql.toJSON()).to.eql({
+      sql:
+        'SELECT DISTINCT `CUSTOMER`.`NAME`,' +
+                        '`CUSTOMER`.`VIP`,' +
+                        '`CUSTOMER`.`ADDRESS`,'+
+                        '`CUSTOMER`.`FAVORITE_STORE` ' +
+        'FROM `CUSTOMER` ' +
+        'LEFT JOIN `ORDER` AS `orders` ' +
+          'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME` ' +
+        'INNER JOIN `STORE` AS `orders_store` ' +
+          'ON `orders`.`STORE_ID`=`orders_store`.`ID` AND ( ( (`orders_store`.`STATE`=$1) OR (`orders_store`.`STATE`=$2) ) AND `orders_store`.`ID`=$3 )   ' +
+        'ORDER BY `CUSTOMER`.`NAME`',
+      params: ['NY', 'LA', 1]
     });
   });
 
@@ -989,8 +1020,8 @@ describe('sql connector', function() {
         'LEFT JOIN `ORDER` AS `orders` ' +
           'ON `CUSTOMER`.`NAME`=`orders`.`CUSTOMER_NAME`  ' +
         'WHERE `CUSTOMER`.`NAME`=$1 ' +
-          'AND (`orders`.`DATE` BETWEEN $2 AND $3) ' +
-          'OR (`orders`.`DATE` BETWEEN $4 AND $5)',
+          'AND ( (`orders`.`DATE` BETWEEN $2 AND $3) ' +
+          'OR (`orders`.`DATE` BETWEEN $4 AND $5) )',
       params: [
         'John',
         '2015-01-01',
